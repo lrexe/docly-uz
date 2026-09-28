@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /**
  * app/(twa)/categories/[slug]/page.tsx
@@ -26,15 +26,16 @@ interface TemplateRow {
 
 export const dynamic = "force-dynamic";
 
-export default async function CategoryPage({ params }: { params: { slug: string } }) {
-  const category = CATEGORY_MAP[params.slug];
+export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const category = CATEGORY_MAP[slug];
   if (!category) notFound();
 
-  const supabase = createClient();
+  const supabase = createServerSupabaseClient();
   const { data: templates, error } = await supabase
     .from("document_templates")
     .select("id, title_ru, title_uz, description_ru, description_uz, price_tiyin, icon")
-    .eq("category", params.slug)
+    .eq("category", slug)
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 

@@ -1,4 +1,4 @@
-// middleware.ts (в корне проекта, на одном уровне с /app)
+// proxy.ts (в корне проекта, на одном уровне с /app)
 // Централизованная валидация Telegram initData для всех защищённых API-роутов.
 // Идея: HMAC-проверка делается ОДИН раз здесь, а не дублируется в каждом route.ts.
 //
@@ -28,7 +28,7 @@ function extractInitData(req: NextRequest): string | null {
   return req.headers.get('x-telegram-init-data');
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const initData = extractInitData(req);
   if (!initData) {
     return NextResponse.json({ error: 'MISSING_INIT_DATA' }, { status: 401 });
@@ -36,7 +36,7 @@ export async function middleware(req: NextRequest) {
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
-    console.error('[middleware] TELEGRAM_BOT_TOKEN не задан');
+    console.error('[proxy] TELEGRAM_BOT_TOKEN не задан');
     return NextResponse.json({ error: 'SERVER_MISCONFIGURED' }, { status: 500 });
   }
 

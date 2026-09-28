@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 import { useTelegram } from "@/components/twa/TelegramProvider";
 
 /**
@@ -38,43 +37,23 @@ function buildClickUrl(userId: string, amountUzs: number) {
 }
 
 export default function BillingPage() {
-  const { webApp, user: tgUser } = useTelegram();
-  const [supabase] = useState(() => createClient());
+  const { dbUser, isAuthenticating, refreshUser } = useTelegram();
 
-  const [userId, setUserId] = useState<string | null>(null);
-  const [balanceTiyin, setBalanceTiyin] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const userId = dbUser?.id ?? null;
+  const balanceTiyin = dbUser?.balance ?? 0;
+  const loading = isAuthenticating && !dbUser;
+
   const [selectedAmount, setSelectedAmount] = useState<number>(QUICK_AMOUNTS_UZS[1]);
   const [customAmount, setCustomAmount] = useState("");
 
-  const loadBalance = useCallback(async () => {
-    if (!tgUser?.id) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("users")
-      .select("id, balance")
-      .eq("telegram_id", tgUser.id)
-      .maybeSingle();
-
-    if (!error && data) {
-      setUserId(data.id);
-      setBalanceTiyin(data.balance ?? 0);
-    }
-    setLoading(false);
-  }, [supabase, tgUser?.id]);
-
-  useEffect(() => {
-    loadBalance();
-  }, [loadBalance]);
-
-  // Re-check the balance when the user returns to the TWA after paying.
+  // Возврат в Mini App после оплаты — перечитываем баланс из БД.
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") loadBalance();
+      if (document.visibilityState === "visible") refreshUser();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [loadBalance]);
+  }, [refreshUser]);
 
   const effectiveAmount = customAmount ? Number(customAmount) : selectedAmount;
   const canPay = Boolean(userId) && effectiveAmount > 0;
@@ -83,9 +62,10 @@ export default function BillingPage() {
     if (!userId || !canPay) return;
     const url = provider === "payme" ? buildPaymeUrl(userId, effectiveAmount) : buildClickUrl(userId, effectiveAmount);
 
-    if (webApp?.openLink) {
-      webApp.openLink(url);
-    } else if (typeof window !== "undefined") {
+    const tg = (window as any)?.Telegram?.WebApp;
+    if (tg?.openLink) {
+      tg.openLink(url);
+    } else {
       window.open(url, "_blank");
     }
   };
@@ -101,7 +81,7 @@ export default function BillingPage() {
           Доступно
         </p>
         <p className="mt-1 text-3xl font-bold" style={{ color: "var(--tg-theme-text-color, #111111)" }}>
-          {loading ? "…" : `${((balanceTiyin ?? 0) / 100).toLocaleString("ru-RU")} сум`}
+          {loading ? "…" : `${(balanceTiyin / 100).toLocaleString("ru-RU")} сум`}
         </p>
       </section>
 

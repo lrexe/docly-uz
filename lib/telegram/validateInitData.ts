@@ -1,13 +1,15 @@
-// lib/telegram/validateInitDataEdge.ts
-// Edge Runtime-совместимая версия валидации Telegram initData.
+// lib/telegram/validateInitData.ts
+// Node.js Runtime-версия валидации Telegram initData (использует встроенный модуль `crypto`).
 //
-// ЗАЧЕМ ОТДЕЛЬНЫЙ ФАЙЛ: Next.js Middleware по умолчанию исполняется в Edge Runtime,
-// где недоступен Node.js модуль `crypto` (createHmac/timingSafeEqual из
-// lib/telegram/validateInitData.ts). Здесь используется Web Crypto API (crypto.subtle),
-// который есть и в Edge Runtime, и в Node.js 19+ — один и тот же код работает в обоих.
+// ЗАЧЕМ ОТДЕЛЬНЫЙ ФАЙЛ ОТ validateInitDataEdge.ts: обычные Route Handlers
+// (app/api/**/route.ts) по умолчанию исполняются в Node.js Runtime, где доступен
+// быстрый нативный `crypto.createHmac` и `crypto.timingSafeEqual`. Только
+// middleware.ts (Edge Runtime) не может использовать этот файл — там нужен
+// lib/telegram/validateInitDataEdge.ts (Web Crypto API).
 //
-// Алгоритм ровно тот же, что и в lib/telegram/validateInitData.ts (см. комментарии там) —
-// см. https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+// Алгоритм: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+
+import { createHmac, timingSafeEqual } from 'crypto';
 
 export interface TelegramUser {
   id: number;
@@ -34,48 +36,16 @@ export interface ValidateInitDataResult {
 
 const MAX_AUTH_AGE_SECONDS = 24 * 60 * 60; // 24 часа
 
-/** HMAC-SHA256 через Web Crypto API (доступен в Edge Runtime и в Node 19+). */
-async function hmacSha256(keyBytes: Uint8Array, message: string): Promise<ArrayBuffer> {
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyBytes,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
-}
-
-function bufferToHex(buffer: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 /**
- * Сравнение двух hex-строк за постоянное время. Node's `timingSafeEqual` недоступен
- * в Edge Runtime, поэтому реализуем через XOR-аккумулятор — время выполнения не зависит
- * от того, на каком символе произошло первое несовпадение.
+ * Синхронная валидация initData, присланного Telegram Mini App клиентом.
+ * Используется во всех обычных Route Handlers (Node.js Runtime).
+ * Для middleware.ts (Edge Runtime) — см. validateInitDataEdge.ts.
  */
-function constantTimeEqualHex(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
-
-/**
- * Асинхронная (Web Crypto — всегда Promise) валидация initData.
- * Используется в middleware.ts. Для валидации внутри обычных Route Handlers
- * можно продолжать использовать синхронную lib/telegram/validateInitData.ts.
- */
-export async function validateTelegramInitDataEdge(
+export function validateTelegramInitData(
   initData: string,
   botToken: string,
   maxAgeSeconds: number = MAX_AUTH_AGE_SECONDS
-): Promise<ValidateInitDataResult> {
+): ValidateInitDataResult {
   if (!initData || initData.trim() === '') {
     return { valid: false, reason: 'EMPTY_INIT_DATA' };
   }
@@ -94,6 +64,7 @@ export async function validateTelegramInitDataEdge(
     return { valid: false, reason: 'EXPIRED', authDate };
   }
 
+  // Data-check-string: все пары key=value (кроме hash), отсортированные по ключу, через \n.
   const dataCheckEntries: string[] = [];
   params.forEach((value, key) => {
     if (key === 'hash') return;
@@ -102,11 +73,18 @@ export async function validateTelegramInitDataEdge(
   dataCheckEntries.sort();
   const dataCheckString = dataCheckEntries.join('\n');
 
-  const secretKeyBuffer = await hmacSha256(new TextEncoder().encode('WebAppData'), botToken);
-  const calculatedHashBuffer = await hmacSha256(new Uint8Array(secretKeyBuffer), dataCheckString);
-  const calculatedHash = bufferToHex(calculatedHashBuffer);
+  // secret_key = HMAC_SHA256("WebAppData", bot_token) — именно в этом порядке
+  // (bot_token — данные, "WebAppData" — ключ), см. документацию Telegram.
+  const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const calculatedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-  if (!constantTimeEqualHex(calculatedHash, receivedHash)) {
+  const receivedBuf = Buffer.from(receivedHash, 'hex');
+  const calculatedBuf = Buffer.from(calculatedHash, 'hex');
+
+  const signaturesMatch =
+    receivedBuf.length === calculatedBuf.length && timingSafeEqual(receivedBuf, calculatedBuf);
+
+  if (!signaturesMatch) {
     return { valid: false, reason: 'SIGNATURE_MISMATCH', authDate };
   }
 

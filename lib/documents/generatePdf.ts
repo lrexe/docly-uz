@@ -16,7 +16,7 @@
 // Шрифты Roboto можно взять из репозитория pdfmake (examples/fonts) — они кириллицу
 // поддерживают, что критично для русского и узбекского (кириллица/латиница) текста.
 
-import PdfPrinter from 'pdfmake';
+import pdfmake from 'pdfmake';
 import path from 'path';
 import { parseMarkdown, inlineTokensToRuns, firstParagraphTokens, type InlineRun } from './markdownTokens';
 
@@ -136,7 +136,10 @@ export async function generatePdfBuffer(markdown: string, options?: { title?: st
   const tokens = parseMarkdown(markdown);
   const content = tokensToPdfContent(tokens);
 
-  const printer = new PdfPrinter(fonts);
+  pdfmake.setFonts(fonts);
+  // Запрещаем загрузку внешних URL и ограничиваем чтение диска только папкой шрифтов.
+  pdfmake.setUrlAccessPolicy(() => false);
+  pdfmake.setLocalAccessPolicy((p: string) => path.resolve(p).startsWith(FONTS_DIR));
 
   const docDefinition: any = {
     info: { title: options?.title ?? 'Docly.uz' },
@@ -145,13 +148,6 @@ export async function generatePdfBuffer(markdown: string, options?: { title?: st
     content,
   };
 
-  const pdfDoc = printer.createPdfKitDocument(docDefinition);
-
-  return new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
-    pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-    pdfDoc.on('error', reject);
-    pdfDoc.end();
-  });
+  const buffer = await pdfmake.createPdf(docDefinition).getBuffer();
+  return Buffer.from(buffer);
 }

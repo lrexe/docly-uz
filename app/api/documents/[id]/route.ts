@@ -8,8 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { validateTelegramInitData } from '@/lib/telegram/validateInitData';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const initData = req.headers.get('x-telegram-init-data');
     if (!initData) return NextResponse.json({ error: 'MISSING_INIT_DATA' }, { status: 401 });
 
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .select(
         'id, user_id, status, language, generated_content, pdf_url, docx_url, created_at, document_templates ( title_ru, title_uz, category )'
       )
-      .eq('id', params.id)
+      .eq('id', id)
       .maybeSingle();
 
     if (error || !doc) {

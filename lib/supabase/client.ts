@@ -1,55 +1,24 @@
-// lib/supabase/server.ts
-// Серверный Supabase-клиент для использования ИСКЛЮЧИТЕЛЬНО внутри Route Handlers
-// (app/api/**/route.ts) и Server Components/Actions. Использует SERVICE ROLE ключ,
-// который обходит Row Level Security — поэтому этот клиент НИКОГДА не должен
-// импортироваться в клиентский ('use client') код или утекать в бандл браузера.
-//
-// Модель безопасности: авторизация пользователя происходит на уровне API route
-// через validateTelegramInitData() ДО любого обращения к этому клиенту. Сам Supabase
-// не знает о Telegram-пользователях — доверенной границей является наш backend.
+// lib/supabase/client.ts
+// Браузерный Supabase-клиент (anon key, работает под Row Level Security).
+// Безопасен для импорта из 'use client' компонентов.
+// SERVICE ROLE ключ здесь использовать НЕЛЬЗЯ — он утечёт в бандл браузера.
+// Для серверного кода см. lib/supabase/server.ts.
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-// Импортируйте типизацию, как только она будет сгенерирована из БД
-// (`supabase gen types typescript --project-id <id> > types/database.ts`),
-// и замените `Database = any` на `import type { Database } from '@/types/database'`.
-type Database = any;
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let browserClient: SupabaseClient | null = null;
 
-if (!supabaseUrl) {
-  throw new Error('NEXT_PUBLIC_SUPABASE_URL не задан в переменных окружения');
-}
-if (!serviceRoleKey) {
-  throw new Error(
-    'SUPABASE_SERVICE_ROLE_KEY не задан в переменных окружения. ' +
-      'Никогда не используйте anon key на сервере для операций, требующих обхода RLS.'
-  );
-}
+export function createClient(): SupabaseClient {
+  if (browserClient) return browserClient;
 
-// Синглтон: избегаем создания нового клиента (и нового пула соединений) на каждый
-// вызов createServerSupabaseClient() в рамках одного serverless-инстанса/lambda.
-let cachedClient: SupabaseClient<Database> | null = null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY должны быть заданы');
+  }
 
-/**
- * Возвращает серверный Supabase-клиент с правами service_role.
- * Использовать только внутри app/api/**\/route.ts после валидации initData.
- */
-export function createServerSupabaseClient(): SupabaseClient<Database> {
-  if (cachedClient) return cachedClient;
-
-  cachedClient = createClient<Database>(supabaseUrl!, serviceRoleKey!, {
-    auth: {
-      // Service role клиенту не нужна персистентная сессия — каждый запрос независим.
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'docly-uz-server',
-      },
-    },
+  browserClient = createSupabaseClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
   });
-
-  return cachedClient;
+  return browserClient;
 }
