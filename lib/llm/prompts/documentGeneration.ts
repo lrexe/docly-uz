@@ -10,6 +10,7 @@ export interface TemplateFieldOption {
 
 export interface TemplateField {
   key: string;
+  placeholder?: string;
   type: 'text' | 'number' | 'date' | 'select' | 'radio' | 'textarea';
   label_ru: string;
   label_uz: string;

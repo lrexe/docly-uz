@@ -12,12 +12,15 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
+  themeColor: "#1b2f5e",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="ru"
+      suppressHydrationWarning
       className="h-full antialiased"
     >
       <head>

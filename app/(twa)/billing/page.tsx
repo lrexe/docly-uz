@@ -71,21 +71,21 @@ export default function BillingPage() {
   };
 
   return (
-    <main className="min-h-screen px-4 pb-8 pt-4" style={{ background: "var(--tg-theme-bg-color, #ffffff)" }}>
-      <h1 className="mb-4 text-xl font-semibold" style={{ color: "var(--tg-theme-text-color, #111111)" }}>
+    <main className="min-h-screen px-4 pb-8 pt-4" style={{ background: "#ffffff" }}>
+      <h1 className="mb-4 text-xl font-semibold" style={{ color: "#111111" }}>
         Баланс
       </h1>
 
-      <section className="mb-6 rounded-2xl p-5" style={{ background: "var(--tg-theme-secondary-bg-color, #f7f7f8)" }}>
-        <p className="text-sm opacity-80" style={{ color: "var(--tg-theme-hint-color, #999999)" }}>
+      <section className="mb-6 rounded-2xl p-5" style={{ background: "#f7f7f8" }}>
+        <p className="text-sm opacity-80" style={{ color: "#999999" }}>
           Доступно
         </p>
-        <p className="mt-1 text-3xl font-bold" style={{ color: "var(--tg-theme-text-color, #111111)" }}>
+        <p className="mt-1 text-3xl font-bold" style={{ color: "#111111" }}>
           {loading ? "…" : `${(balanceTiyin / 100).toLocaleString("ru-RU")} сум`}
         </p>
       </section>
 
-      <h2 className="mb-3 text-sm font-medium opacity-80" style={{ color: "var(--tg-theme-hint-color, #999999)" }}>
+      <h2 className="mb-3 text-sm font-medium opacity-80" style={{ color: "#999999" }}>
         Пополнить счёт
       </h2>
 
@@ -101,9 +101,9 @@ export default function BillingPage() {
               }}
               className="rounded-xl border py-3 text-sm font-medium"
               style={{
-                borderColor: "var(--tg-theme-hint-color, #eeeeee)",
-                background: active ? "var(--tg-theme-button-color, #3390ec)" : "var(--tg-theme-secondary-bg-color, #f7f7f8)",
-                color: active ? "var(--tg-theme-button-text-color, #ffffff)" : "var(--tg-theme-text-color, #111111)",
+                borderColor: "#eeeeee",
+                background: active ? "#1b2f5e" : "#f7f7f8",
+                color: active ? "#ffffff" : "#111111",
               }}
             >
               {value.toLocaleString("ru-RU")} сум
@@ -120,9 +120,9 @@ export default function BillingPage() {
         onChange={(e) => setCustomAmount(e.target.value)}
         className="mb-6 w-full rounded-xl border px-4 py-3 text-sm outline-none"
         style={{
-          borderColor: "var(--tg-theme-hint-color, #eeeeee)",
-          background: "var(--tg-theme-bg-color, #ffffff)",
-          color: "var(--tg-theme-text-color, #111111)",
+          borderColor: "#eeeeee",
+          background: "#ffffff",
+          color: "#111111",
         }}
       />
 
@@ -145,7 +145,7 @@ export default function BillingPage() {
         </button>
       </div>
 
-      <p className="mt-4 text-center text-xs opacity-70" style={{ color: "var(--tg-theme-hint-color, #999999)" }}>
+      <p className="mt-4 text-center text-xs opacity-70" style={{ color: "#999999" }}>
         Зачисление происходит автоматически в течение минуты после оплаты
       </p>
     </main>
